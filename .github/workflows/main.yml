@@ -1,11 +1,10 @@
-name: Manual APK Build and Send to Telegram
+name: Manual Firefox for Android Build
 
 on:
-  workflow_dispatch:  # запуск только вручную через GitHub UI
+  workflow_dispatch:  # Запуск вручную
 
 jobs:
   build:
-    name: Build and Send APK
     runs-on: ubuntu-latest
 
     steps:
@@ -18,17 +17,32 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v2
+      - name: Set up Rust (required by mach)
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x ./gradlew
+      - name: Install Python 3 and dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3 python3-venv python3-pip
+          python3 -m venv venv
+          source venv/bin/activate
+          pip install -r python/requirements.txt
 
-      - name: Build APK
-        run: ./gradlew assembleDebug
+      - name: Bootstrap Firefox build environment
+        run: ./mach bootstrap --no-interactive
 
-      - name: Upload APK
+      - name: Build using mach
+        run: ./mach build
+
+      - name: Package APK
+        run: ./mach package
+
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: fennec-apk
+          path: obj-arm64-v8a/dist/*.apk
